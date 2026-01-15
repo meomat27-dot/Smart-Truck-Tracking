@@ -9,77 +9,62 @@
     <style>
         :root { --primary: #1a237e; --bg: #f8f9fa; }
         body { margin: 0; padding: 0; background: var(--bg); font-family: system-ui; height: 100dvh; overflow: hidden; }
-        
         .setup-container { height: 100%; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .setup-card { background: white; width: 100%; max-width: 400px; padding: 35px 25px; border-radius: 28px; box-shadow: 0 15px 50px rgba(0,0,0,0.1); text-align: center; }
-        
-        .form-control-lg { border-radius: 14px; border: 2px solid #f0f0f0; font-size: 1.3rem; height: 60px; text-align: center; margin-bottom: 20px; }
-        .btn-generate { background: var(--primary); color: white; border: none; border-radius: 14px; height: 65px; font-size: 1.2rem; font-weight: 700; width: 100%; transition: 0.3s; 
-            /* هنا المسافة تحت الزر */
-            margin-bottom: 40px; 
-        }
-        .btn-generate:active { transform: scale(0.98); opacity: 0.9; }
-
-        /* تنسيق حاوية الباركود لضمان المسافة والمركزية */
-        #qrcode { display: flex; justify-content: center; align-items: center; min-height: 200px; }
-        #qrcode img { border: 8px solid #fff; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
-
-        #map-view { position: fixed; inset: 0; display: none; }
-        #map { height: 100%; width: 100%; }
-        .floating-nav { position: absolute; top: 15px; left: 15px; right: 15px; z-index: 1000; background: white; padding: 15px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
+        .form-control-lg { border-radius: 14px; border: 2px solid #f0f0f0; font-size: 1.1rem; text-align: center; margin-bottom: 20px; }
+        .btn-primary-custom { background: var(--primary); color: white; border-radius: 14px; padding: 12px; width: 100%; font-weight: 600; border: none; }
+        #qrcode { display: flex; justify-content: center; margin-top: 25px; }
+        #map { height: 100dvh; width: 100%; }
+        #map-view { display: none; position: relative; }
+        .floating-badge { position: absolute; top: 20px; right: 20px; z-index: 1000; background: white; padding: 10px 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="eng-panel" class="setup-container">
     <div class="setup-card">
-        <h2 class="fw-bold mb-2">إدارة الصب</h2>
-        <p class="text-muted mb-4">أدخل رقم الحافلة لإنشاء الرابط</p>
-        
-        <input type="number" id="bus-id" class="form-control form-control-lg" placeholder="1" inputmode="numeric">
-        
-        <button class="btn-generate shadow-sm" onclick="generateTrip()">توليد الباركود</button>
-        
+        <h3 class="mb-4" style="color: var(--primary); font-weight: 800;">تتبع الشاحنة</h3>
+        <input type="number" id="bus-id" class="form-control form-control-lg" placeholder="أدخل رقم الحافلة">
+        <button class="btn btn-primary-custom" onclick="generateTracker()">توليد الباركود والمراقبة</button>
         <div id="qrcode"></div>
-        
-        <p id="wait-msg" class="mt-4 text-primary fw-bold" style="display:none; animation: fade 1.5s infinite;">
-            بانتظار موافقة السائق...
-        </p>
+        <p id="wait-msg" class="mt-3 text-muted" style="display:none; font-size: 0.9rem;">بانتظار مسح السائق للباركود وبدء الرحلة...</p>
     </div>
 </div>
 
 <div id="map-view">
-    <div class="floating-nav">
-        <div class="fw-bold fs-5">حافلة رقم: <span id="active-bus" class="text-primary"></span></div>
-        <button class="btn btn-danger rounded-pill px-4" onclick="location.reload()">إنهاء</button>
-    </div>
+    <div class="floating-badge">الحافلة: <span id="active-bus">--</span></div>
     <div id="map"></div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
 
 <script>
-    // ضع بيانات Firebase هنا
-    const firebaseConfig = { apiKey: "YOUR_KEY", databaseURL: "YOUR_URL" };
+    // الإعدادات الحقيقية التي استخرجناها
+    const firebaseConfig = {
+        apiKey: "AIzaSyBtyCKVvy_9DcOUcStjkIP2gfFlrulFxAs",
+        databaseURL: "https://the-smart-tracking-default-rtdb.firebaseio.com",
+        projectId: "the-smart-tracking",
+        authDomain: "the-smart-tracking.firebaseapp.com",
+        appId: "1:1005270133021:web:1aed59c64c79a25565d9f4"
+    };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
     let map, marker, path;
 
-    function generateTrip() {
+    function generateTracker() {
         const id = document.getElementById('bus-id').value;
-        if(!id) return;
+        if(!id) { alert("أدخل رقم الحافلة أولاً"); return; }
 
-        // صنع الرابط لصفحة driver.html
         let driverUrl = window.location.origin + window.location.pathname.replace('index.html', '') + "driver.html?id=" + id;
         
         document.getElementById('qrcode').innerHTML = "";
         new QRCode(document.getElementById("qrcode"), { 
             text: driverUrl, 
-            width: 200, 
-            height: 200,
+            width: 200, height: 200,
             correctLevel : QRCode.CorrectLevel.H
         });
         
@@ -99,11 +84,12 @@
             map = L.map('map', {zoomControl: false}).setView([data.lat, data.lng], 16);
             L.tileLayer('https://{s}.tile.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
             marker = L.marker([data.lat, data.lng]).addTo(map);
-            path = L.polyline([], {color: '#1a237e', weight: 6}).addTo(map);
+            path = L.polyline([], {color: '#1a237e', weight: 4}).addTo(map);
         }
-        marker.setLatLng([data.lat, data.lng]);
-        path.addLatLng([data.lat, data.lng]);
-        map.panTo([data.lat, data.lng]);
+        const newPos = [data.lat, data.lng];
+        marker.setLatLng(newPos);
+        path.addLatLng(newPos);
+        map.panTo(newPos);
     }
 </script>
 </body>
