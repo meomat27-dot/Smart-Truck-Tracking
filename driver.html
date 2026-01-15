@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>تفعيل التتبع - السائق</title>
+    <title>واجهة السائق - قبول الرحلة</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #ffffff; height: 100dvh; margin: 0; display: flex; flex-direction: column; font-family: system-ui; overflow: hidden; }
@@ -18,15 +18,16 @@
 <body>
 
 <div class="driver-container">
-    <div id="init-ui" class="w-100">
+    <div id="init-ui" class="w-100 p-3">
         <h2 class="fw-bold mb-4">مركبة رقم: <span id="bus-num" class="text-success">--</span></h2>
-        <button class="btn-start-big" onclick="startJourney()">ابدأ الرحلة الآن</button>
+        <button class="btn-start-big" onclick="startJourney()">قبول وبدء الرحلة الآن</button>
     </div>
 
-    <div id="active-ui" class="w-100" style="display:none;">
+    <div id="active-ui" class="w-100 p-3" style="display:none;">
         <div class="spinner-grow text-success mb-3" role="status"></div>
-        <h3 class="fw-bold text-success">التتبع نشط حالياً</h3>
-        <div class="status-card">لا تغلق هذه الصفحة حتى تصل للموقع</div>
+        <h3 class="fw-bold text-success">تم قبول الرحلة</h3>
+        <p>موقعك الآن يظهر للمهندس بشكل مباشر</p>
+        <div class="status-card text-muted">الرجاء إبقاء الصفحة مفتوحة</div>
     </div>
 </div>
 
@@ -34,7 +35,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
 
 <script>
-    // الربط البرمجي الحقيقي
+    // إعدادات Firebase الخاصة بك
     const firebaseConfig = {
         apiKey: "AIzaSyBtyCKVvy_9DcOUcStjkIP2gfFlrulFxAs",
         databaseURL: "https://the-smart-tracking-default-rtdb.firebaseio.com",
@@ -51,26 +52,37 @@
 
     function startJourney() {
         if(!busId) return;
+
+        // 1. طلب إذن الموقع من السائق
         if(navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
-                // إرسال البيانات لأول مرة
+                
+                // 2. تحديث قاعدة البيانات بـ "started: true" وإرسال أول إحداثيات
+                // هذه الخطوة هي التي ستجعل الخريطة تظهر عند المهندس فوراً
                 db.ref('trips/' + busId).set({
                     started: true,
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     timestamp: Date.now()
-                });
-                document.getElementById('init-ui').style.display = 'none';
-                document.getElementById('active-ui').style.display = 'block';
+                }).then(() => {
+                    // 3. تغيير واجهة السائق بعد النجاح
+                    document.getElementById('init-ui').style.display = 'none';
+                    document.getElementById('active-ui').style.display = 'block';
 
-                // مراقبة الحركة وتحديث الموقع تلقائياً
-                navigator.geolocation.watchPosition(p => {
-                    db.ref('trips/' + busId).update({
-                        lat: p.coords.latitude,
-                        lng: p.coords.longitude
-                    });
-                }, null, { enableHighAccuracy: true });
-            }, err => alert("يرجى تفعيل الـ GPS في الموبايل"));
+                    // 4. البدء بتتبع الموقع لحظة بلحظة (Watch)
+                    navigator.geolocation.watchPosition(p => {
+                        db.ref('trips/' + busId).update({
+                            lat: p.coords.latitude,
+                            lng: p.coords.longitude
+                        });
+                    }, null, { enableHighAccuracy: true });
+                });
+
+            }, err => {
+                alert("يرجى تفعيل خدمة الموقع (GPS) للمتابعة");
+            });
+        } else {
+            alert("متصفحك لا يدعم خاصية تحديد الموقع");
         }
     }
 </script>
