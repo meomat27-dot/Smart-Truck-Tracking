@@ -11,8 +11,10 @@
         .btn-start-big { 
             width: 100%; height: 80px; font-size: 1.6rem; font-weight: 800; border-radius: 20px;
             background: #27ae60; border: none; color: white; box-shadow: 0 10px 30px rgba(39, 174, 96, 0.3);
+            transition: transform 0.2s;
         }
-        .status-card { background: #f8f9fa; padding: 20px; border-radius: 20px; width: 100%; margin-top: 20px; }
+        .btn-start-big:active { transform: scale(0.95); }
+        .status-card { background: #f8f9fa; padding: 20px; border-radius: 20px; width: 100%; margin-top: 20px; border: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -24,9 +26,12 @@
     </div>
 
     <div id="active-ui" class="w-100 p-3" style="display:none;">
-        <div class="spinner-grow text-success mb-3" role="status"></div>
+        <div class="spinner-grow text-success mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
         <h3 class="fw-bold text-success">التتبع نشط حالياً</h3>
-        <div class="status-card">لا تغلق هذه الصفحة حتى تصل للموقع</div>
+        <div class="status-card">
+            <p class="mb-2">بث الموقع شغال...</p>
+            <small class="text-muted">لا تغلق هذه الصفحة أو تقفل الشاشة لضمان استمرار التتبع</small>
+        </div>
     </div>
 </div>
 
@@ -34,7 +39,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
 
 <script>
-    // نفس الإعدادات للربط
     const firebaseConfig = {
         apiKey: "AIzaSyBtyCKVvy_9DcOUcStjkIP2gfFlrulFxAs",
         databaseURL: "https://the-smart-tracking-default-rtdb.firebaseio.com",
@@ -50,25 +54,33 @@
     document.getElementById('bus-num').innerText = busId || "00";
 
     function startJourney() {
-        if(!busId) return;
+        if(!busId) { alert("رقم الحافلة غير معروف!"); return; }
+        
         if(navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
+                // إرسال أول نقطة وتفعيل الرحلة
                 db.ref('trips/' + busId).set({
                     started: true,
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     timestamp: Date.now()
                 });
+
                 document.getElementById('init-ui').style.display = 'none';
                 document.getElementById('active-ui').style.display = 'block';
 
+                // مراقبة الموقع باستمرار (High Accuracy لجودة ويز)
                 navigator.geolocation.watchPosition(p => {
                     db.ref('trips/' + busId).update({
                         lat: p.coords.latitude,
-                        lng: p.coords.longitude
+                        lng: p.coords.longitude,
+                        timestamp: Date.now()
                     });
                 }, null, { enableHighAccuracy: true });
-            }, err => alert("يرجى تفعيل الـ GPS في المتصفح"));
+
+            }, err => alert("يرجى السماح بالوصول للموقع (GPS)"));
+        } else {
+            alert("متصفحك لا يدعم تتبع الموقع");
         }
     }
 </script>
